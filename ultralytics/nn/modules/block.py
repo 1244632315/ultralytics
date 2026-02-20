@@ -50,6 +50,7 @@ __all__ = (
     "RepNCSPELAN4",
     "RepVGGDW",
     "ResNetLayer",
+    "ResStem",
     "SCDown",
     "TorchVision",
 )
@@ -479,6 +480,29 @@ class Bottleneck(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Apply bottleneck with optional shortcut connection."""
         return x + self.cv2(self.cv1(x)) if self.add else self.cv2(self.cv1(x))
+
+
+class ResStem(nn.Module):
+    """Shallow ResBlock stem for lightweight input preprocessing."""
+
+    def __init__(self, c1: int, c2: int, k: int = 3, s: int = 2, n: int = 1, e: float = 0.5):
+        """Initialize ResStem.
+
+        Args:
+            c1 (int): Input channels.
+            c2 (int): Output channels.
+            k (int): Stem convolution kernel size.
+            s (int): Stem convolution stride.
+            n (int): Number of residual bottleneck blocks.
+            e (float): Bottleneck expansion ratio.
+        """
+        super().__init__()
+        self.stem = Conv(c1, c2, k, s)
+        self.blocks = nn.Sequential(*(Bottleneck(c2, c2, shortcut=True, e=e) for _ in range(max(n, 1))))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Apply stem convolution followed by shallow residual preprocessing blocks."""
+        return self.blocks(self.stem(x))
 
 
 class BottleneckCSP(nn.Module):

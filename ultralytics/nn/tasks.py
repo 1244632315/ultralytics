@@ -62,6 +62,7 @@ from ultralytics.nn.modules import (
     RepNCSPELAN4,
     RepVGGDW,
     ResNetLayer,
+    ResStem,
     RTDETRDecoder,
     SCDown,
     Segment,
@@ -1602,6 +1603,7 @@ def parse_model(d, ch, verbose=True):
             SCDown,
             C2fCIB,
             A2C2f,
+            ResStem,
         }
     )
     repeat_modules = frozenset(  # modules with 'repeat' arguments
