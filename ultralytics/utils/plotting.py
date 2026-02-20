@@ -744,8 +744,23 @@ def plot_images(
     bs, _, h, w = images.shape  # batch size, _, height, width
     bs = min(bs, max_subplots)  # limit plot images
     ns = np.ceil(bs**0.5)  # number of subplots (square)
-    if np.max(images[0]) <= 1:
-        images *= 255  # de-normalise (optional)
+
+    # Robust visualization normalization for high-dynamic-range images (e.g., float32 16-bit-like data).
+    # Apply per-image percentile clipping and scale to uint8 before drawing.
+    if images.dtype != np.uint8:
+        vis_images = np.empty_like(images, dtype=np.float32)
+        for i in range(len(images)):
+            im = images[i].astype(np.float32, copy=False)
+            p_low, p_high = np.percentile(im, (0.5, 99.5))
+            if np.isfinite(p_low) and np.isfinite(p_high) and p_high > p_low:
+                im = np.clip(im, p_low, p_high)
+                im = (im - p_low) / (p_high - p_low)
+            else:
+                im = np.nan_to_num(im, nan=0.0, posinf=0.0, neginf=0.0)
+                im_min, im_max = float(im.min()), float(im.max())
+                im = (im - im_min) / (im_max - im_min) if im_max > im_min else np.zeros_like(im)
+            vis_images[i] = im
+        images = (vis_images * 255.0).clip(0, 255).astype(np.uint8)
 
     # Build Image
     mosaic = np.full((int(ns * h), int(ns * w), 3), 255, dtype=np.uint8)  # init

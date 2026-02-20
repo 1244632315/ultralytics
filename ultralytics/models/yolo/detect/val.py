@@ -72,7 +72,21 @@ class DetectionValidator(BaseValidator):
         for k, v in batch.items():
             if isinstance(v, torch.Tensor):
                 batch[k] = v.to(self.device, non_blocking=self.device.type == "cuda")
-        batch["img"] = (batch["img"].half() if self.args.half else batch["img"].float()) / 255
+        img = batch["img"]
+        scale = float(self.data.get("img_scale", 0) or 0)
+        if scale <= 0:
+            if img.is_floating_point():
+                m = float(img.max())
+                scale = 1.0 if m <= 1.0 + torch.finfo(img.dtype).eps else 65535.0 if m > 255.0 else 255.0
+            else:
+                scale = float(torch.iinfo(img.dtype).max)
+        # Keep float32 for scaling to avoid fp16 overflow on high-dynamic-range inputs (e.g., 0-65535).
+        img = img.float()
+        if img.max() > 1.0 + torch.finfo(img.dtype).eps:
+            img = img / scale
+        if self.args.half:
+            img = img.half()
+        batch["img"] = img
         return batch
 
     def init_metrics(self, model: torch.nn.Module) -> None:

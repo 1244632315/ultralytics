@@ -116,7 +116,21 @@ class DetectionTrainer(BaseTrainer):
         for k, v in batch.items():
             if isinstance(v, torch.Tensor):
                 batch[k] = v.to(self.device, non_blocking=self.device.type == "cuda")
-        batch["img"] = batch["img"].float() / 255
+        img = batch["img"]
+        scale = float(self.data.get("img_scale", 0) or 0)
+        if scale <= 0:
+            if img.is_floating_point():
+                m = float(img.max())
+                scale = 1.0 if m <= 1.0 + torch.finfo(img.dtype).eps else 65535.0 if m > 255.0 else 255.0
+            else:
+                scale = float(torch.iinfo(img.dtype).max)
+        if img.is_floating_point():
+            img = img.float()
+            if img.max() > 1.0 + torch.finfo(img.dtype).eps:
+                img = img / scale
+        else:
+            img = img.float() / scale
+        batch["img"] = img
         if self.args.multi_scale > 0.0:
             imgs = batch["img"]
             sz = (

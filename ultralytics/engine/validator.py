@@ -145,6 +145,9 @@ class BaseValidator:
             self.data = trainer.data
             # Force FP16 val during training
             self.args.half = self.device.type != "cpu" and trainer.amp
+            # Disable forced FP16 validation for high-dynamic-range inputs to improve numerical stability.
+            if float(self.data.get("img_scale", 0) or 0) > 255.0:
+                self.args.half = False
             model = trainer.ema.ema or trainer.model
             if trainer.args.compile and hasattr(model, "_orig_mod"):
                 model = model._orig_mod  # validate non-compiled original model to avoid issues
