@@ -1101,7 +1101,7 @@ class v8OBBLoss(v8DetectionLoss):
             fg_mask (torch.Tensor): Foreground mask indicating valid predictions.
             weight (torch.Tensor): Loss weights for each prediction.
             target_scores_sum (torch.Tensor): Sum of target scores for normalization.
-            lambda_val (int): Controls the sensitivity to aspect ratio.
+            lambda_val (int): Controls how fast angle weight increases with elongation.
 
         Returns:
             (torch.Tensor): The calculated angle loss.
@@ -1111,8 +1111,13 @@ class v8OBBLoss(v8DetectionLoss):
         pred_theta = pred_bboxes[..., 4]
         target_theta = target_bboxes[..., 4]
 
-        log_ar = torch.log((w_gt + 1e-9) / (h_gt + 1e-9))
-        scale_weight = torch.exp(-(log_ar**2) / (lambda_val**2))
+        # For sparse trajectory-like targets, orientation is more reliable on elongated boxes.
+        # Increase angle supervision with elongation instead of suppressing it.
+        long_side = torch.maximum(w_gt, h_gt)
+        short_side = torch.minimum(w_gt, h_gt)
+        log_ar = torch.log((long_side + 1e-9) / (short_side + 1e-9))
+        elongation = torch.clamp(log_ar / lambda_val, min=0.0, max=2.0)
+        scale_weight = 1.0 + elongation
 
         delta_theta = pred_theta - target_theta
         delta_theta_wrapped = delta_theta - torch.round(delta_theta / math.pi) * math.pi
