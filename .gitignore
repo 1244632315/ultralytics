@@ -1,7 +1,15 @@
+compares/MSAMNet-master/result
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+compare/result
+*.pt
+*.Identifier
+*.tar
+.codex
 
 # C extensions
 *.so

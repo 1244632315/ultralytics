@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import os
 from typing import Any
 
 import torch
@@ -975,6 +976,12 @@ class v8OBBLoss(v8DetectionLoss):
             topk2=tal_topk2,
         )
         self.bbox_loss = RotatedBboxLoss(self.reg_max).to(self.device)
+        # Auxiliary centerline endpoint supervision for sparse, elongated trajectories.
+        # Allow runtime override (e.g., baseline runs set YOLO_ENDPOINT_GAIN=0.0).
+        try:
+            self.endpoint_gain = float(os.getenv("YOLO_ENDPOINT_GAIN", "0.25"))
+        except ValueError:
+            self.endpoint_gain = 0.25
 
     def preprocess(self, targets: torch.Tensor, batch_size: int, scale_tensor: torch.Tensor) -> torch.Tensor:
         """Preprocess targets for oriented bounding box detection."""
@@ -1061,9 +1068,9 @@ class v8OBBLoss(v8DetectionLoss):
                 stride_tensor,
             )
             weight = target_scores.sum(-1)[fg_mask]
-            loss[3] = self.calculate_angle_loss(
-                pred_bboxes, target_bboxes, fg_mask, weight, target_scores_sum
-            )  # angle loss
+            angle_loss = self.calculate_angle_loss(pred_bboxes, target_bboxes, fg_mask, weight, target_scores_sum)
+            endpoint_loss = self.calculate_endpoint_loss(pred_bboxes, target_bboxes, fg_mask, weight, target_scores_sum)
+            loss[3] = angle_loss + self.endpoint_gain * endpoint_loss
         else:
             loss[0] += (pred_angle * 0).sum()
 
@@ -1127,6 +1134,34 @@ class v8OBBLoss(v8DetectionLoss):
         ang_loss = ang_loss * weight
 
         return ang_loss.sum() / target_scores_sum
+
+    @staticmethod
+    def _centerline_endpoints(boxes: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Convert xywhr boxes to two centerline endpoints (swap-invariant line representation)."""
+        cx, cy, w, h, theta = boxes.unbind(-1)
+        long_is_w = (w >= h).to(boxes.dtype)
+        phi = theta + (1.0 - long_is_w) * (math.pi / 2.0)
+        half_len = 0.5 * torch.maximum(w, h)
+        dx = half_len * torch.cos(phi)
+        dy = half_len * torch.sin(phi)
+        p1 = torch.stack((cx + dx, cy + dy), dim=-1)
+        p2 = torch.stack((cx - dx, cy - dy), dim=-1)
+        return p1, p2
+
+    def calculate_endpoint_loss(self, pred_bboxes, target_bboxes, fg_mask, weight, target_scores_sum):
+        """Endpoint auxiliary loss on OBB centerline, robust to endpoint order swap."""
+        pred_fg = pred_bboxes[fg_mask]
+        target_fg = target_bboxes[fg_mask]
+        if pred_fg.numel() == 0:
+            return pred_bboxes.sum() * 0.0
+
+        p1, p2 = self._centerline_endpoints(pred_fg)
+        t1, t2 = self._centerline_endpoints(target_fg)
+
+        direct = F.smooth_l1_loss(p1, t1, reduction="none").sum(-1) + F.smooth_l1_loss(p2, t2, reduction="none").sum(-1)
+        swapped = F.smooth_l1_loss(p1, t2, reduction="none").sum(-1) + F.smooth_l1_loss(p2, t1, reduction="none").sum(-1)
+        endpoint_loss = torch.minimum(direct, swapped) * weight
+        return endpoint_loss.sum() / target_scores_sum
 
 
 class E2EDetectLoss:
