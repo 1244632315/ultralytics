@@ -77,7 +77,7 @@ class MSODataset(Dataset):
         seq_id, img_id = self._items[index].split("/")
         image_data = []
         imgs_path = self.images +'/'+ seq_id
-        img_path = self.images +'/'+ self._items[index] +'.tif'
+        img_path = self.images +'/'+ self._items[index] + self.suffix
         img = Image.open(img_path)
         img = self._normalize_frame(img)
         image_data.append(img)
@@ -89,10 +89,10 @@ class MSODataset(Dataset):
         mask = np.expand_dims(mask, axis=0) / 255.0
 
         for id in range(1, self.num_frame):
-            img_his_path = imgs_path +'/%05d.tif' % (int(img_id) - id)
+            img_his_path = imgs_path +'/%05d' % (int(img_id) - id) + self.suffix
             if not os.path.exists(img_his_path):
                 for i in range(1, self.num_frame):
-                    img_his_path = imgs_path +'/%05d.tif' % (int(img_id) - id + i)
+                    img_his_path = imgs_path +'/%05d' % (int(img_id) - id + i) + self.suffix
                     if os.path.exists(img_his_path):
                         break
             img_his = Image.open(img_his_path)

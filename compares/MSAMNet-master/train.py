@@ -127,15 +127,27 @@ class Trainer(object):
             # Load trained model
             print("Loading Resumed Model")
             checkpoint        = torch.load('result/' + args.resume, weights_only=False)
-            self.model.load_state_dict(checkpoint['model_state_dict'])
-            self.start_epoch = checkpoint['epoch']
-            self.train_loss = checkpoint['loss']
-            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            if self.scheduler:
-                self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
-            random.setstate(checkpoint['random_state'])
-            torch.random.set_rng_state(checkpoint['torch_state'])
-            np.random.set_state(checkpoint['np_state'])
+            if 'model_state_dict' in checkpoint:
+                self.model.load_state_dict(checkpoint['model_state_dict'])
+                self.start_epoch = checkpoint.get('epoch', self.start_epoch)
+                self.train_loss = checkpoint.get('loss', self.train_loss)
+                if 'optimizer_state_dict' in checkpoint and checkpoint['optimizer_state_dict'] is not None:
+                    self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+                if self.scheduler and checkpoint.get('scheduler_state_dict') is not None:
+                    self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+                if 'random_state' in checkpoint:
+                    random.setstate(checkpoint['random_state'])
+                if 'torch_state' in checkpoint:
+                    torch.random.set_rng_state(checkpoint['torch_state'])
+                if 'np_state' in checkpoint:
+                    np.random.set_state(checkpoint['np_state'])
+            else:
+                state_dict = checkpoint.get('state_dict')
+                if state_dict is None:
+                    raise KeyError('Checkpoint must contain model_state_dict or state_dict.')
+                self.model.load_state_dict(state_dict)
+                self.start_epoch = args.start_epoch
+                self.train_loss = checkpoint.get('loss', 0)
 
     # Training
     def training(self,epoch):

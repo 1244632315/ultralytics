@@ -27,6 +27,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--t-frame", type=int, default=3)
     parser.add_argument("--input-size", type=int, default=512)
     parser.add_argument("--suffix", type=str, default=".tif")
+    parser.add_argument("--resume", type=str, default="")
+    parser.add_argument("--start-epoch", type=int, default=0)
+    parser.add_argument("--lr", type=float, default=0.01)
+    parser.add_argument("--min-lr", type=float, default=1e-5)
+    parser.add_argument("--optimizer", type=str, default="Adagrad")
+    parser.add_argument("--scheduler", type=str, default="StepLR")
+    parser.add_argument("--step-size", type=int, default=50)
     parser.add_argument("--fusionblock", type=str, default="AAFE")
     parser.add_argument("--model-dir", type=str, default="")
     parser.add_argument("--st-model", type=str, default="")
@@ -66,8 +73,22 @@ def build_command(args: argparse.Namespace) -> list[str]:
                 str(args.epochs),
                 "--train_batch_size",
                 str(args.train_batch_size),
+                "--start_epoch",
+                str(args.start_epoch),
+                "--lr",
+                str(args.lr),
+                "--min_lr",
+                str(args.min_lr),
+                "--optimizer",
+                args.optimizer,
+                "--scheduler",
+                args.scheduler,
+                "--step_size",
+                str(args.step_size),
             ]
         )
+        if args.resume:
+            cmd.extend(["--resume", args.resume])
     else:
         if not args.model_dir or not args.st_model:
             raise ValueError("--model-dir and --st-model are required for test mode.")

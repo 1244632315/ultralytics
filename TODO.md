@@ -79,6 +79,37 @@
   - result: `x_sc_angleloss_v1` `0.8391` -> `x_sc_endpoint_v1` `0.8455` (`+0.0064`)
 - [ ] If needed, increase angle head capacity/receptive field
 
+## Stage 6: Trajectory-Level Comparison Protocol
+- [x] Freeze trajectory-level comparison goal and scope
+  - protocol doc: `tools/xt/TRAJECTORY_EVAL_PROTOCOL.md`
+  - main question: trajectory detected or not, and whether detection is complete enough
+- [ ] Build unified evaluator for detector and segmentation baselines
+  - target outputs: `TDR`, `CTR`, `mean_TC`, `EHR`, `Frag`, `FTPS`
+  - v1 script added: `tools/xt/tools_eval_trajectory_protocol.py`
+  - current status: supports `frame_support` summaries and `box_match_proxy` fallback
+  - reuse current adapters from:
+    - `tools/xt/tools_eval_compare_stack_obb.py`
+    - `tools/xt/tools_eval_kbs_compare_bbox.py`
+    - `tools/xt/tools_eval_kbs_ours_seqmask.py`
+- [x] Define initial pilot sequence subset for protocol calibration
+  - target size: `5-10` representative KBS sequences
+  - include: single target, multi-target, weak target, cluttered background
+  - initial pilot ids: `059 027 006 077 083`
+- [ ] Run Group B first: fair cross-family trajectory comparison
+  - methods: `CSAUNet`, `DNANet`, `DnTNet`, `MSAMNet`, `x_sc_endpoint_v1`
+  - primary table: trajectory-level metrics only
+  - current pilot outputs:
+    - detector reconstruct summary: `runs/kbs_eval/kbs_detector_bbox_pilot5_reconstruct_cpu/ours_xt_sc/summary.json`
+    - protocol report: `runs/trajectory_eval/protocol_pilot5_kbs_bbox/report.md`
+  - current full outputs:
+    - ours reconstruct full: `runs/kbs_eval/kbs_detector_bbox_reconstruct_full_cpu/ours_xt_sc/summary.json`
+    - DNANet ft10 split bbox: `runs/kbs_eval/kbs_dnanet_ft10_split_bbox/summary.json`
+    - MSAMNet ft10 split bbox: `runs/kbs_eval/kbs_msamnet_ft10_split_bbox/summary.json`
+    - merged trajectory report: `runs/trajectory_eval/protocol_kbs_full_reconstruct_and_compare/report.md`
+- [ ] Then rerun Group A and Group C under the same protocol
+  - Group A: `x_only/t_only/x_t/x_sc/x_sc_endpoint_v1`
+  - Group C: same-source vs real-domain transfer comparison
+
 ## Report Deliverables
 - [x] Per-run metrics table (`mAP50`, `mAP50-95`, `P`, `R`)
 - [ ] Same-val-set comparison plots
